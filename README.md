@@ -15,7 +15,7 @@ Este script bash automatiza a coleta e o arquivamento de logs de containers Dock
 - **Simples e Leve:** Implementado em `bash`, sem dependências complexas.
 - **Notificações Visuais:** Utiliza cores no terminal para indicar status e possíveis erros.
 
-### Como Usar
+### 💻 Como Usar
 
 1. **Salve o script:** salve o código em um arquivo, por exemplo: `log_archive.sh`
 2. **Dê permissão de execução:** `chmod +x log_archive.sh`
