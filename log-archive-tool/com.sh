@@ -1,200 +1,227 @@
 #!/bin/bash
 
-# Função para exibir o menu principal
-show_main_menu() {
-    clear
-    echo "╔═══════════════════════════════╗"
-    echo "║       Compressor de Arquivos      ║"
-    echo "╠═══════════════════════════════╣"
-    echo "║ 1. Comprimir Arquivo/Diretório  ║"
-    echo "║ 2. Descomprimir Arquivo         ║"
-    echo "║ 3. Sair                         ║"
-    echo "╚═══════════════════════════════╝"
+
+
+# Função para obter o nome base para o arquivo compactado
+# Remove extensões comuns de arquivamento e compactação.
+get_compress_basename() {
+  local filename
+  filename=$(basename "$1")
+  # Remove .tar.gz, .tgz, .tar.bz2, .tbz2
+  filename=${filename%.tar.gz}
+  filename=${filename%.tgz}
+  filename=${filename%.tar.bz2}
+  filename=${filename%.tbz2}
+  # Remove .tar se for o caso (após remover .gz ou .bz2)
+  filename=${filename%.tar}
+  echo "$filename"
 }
 
-# Função para exibir o menu de compressão
-show_compression_menu() {
-    echo "╔═══════════════════════════════╗"
-    echo "║         Tipo de Compressão        ║"
-    echo "╠═══════════════════════════════╣"
-    echo "║ 1. .tar.gz                      ║"
-    echo "║ 2. .tar.bz2                     ║"
-    echo "║ 3. Voltar ao Menu Principal     ║"
-    echo "╚═══════════════════════════════╝"
+
+# menu - main
+main_menu () {
+  clear
+  echo "╔══════════════════════╗"
+  echo "║  Compactação de Arqs ║" # Título ajustado para PT-BR
+  echo "╠══════════════════════╣"
+  echo "║ 1. Compactar         ║" # Ajustado para PT-BR
+  echo "║ 2. Descompactar      ║" # Ajustado para PT-BR
+  echo "║ 3. Sair              ║" # Ajustado para PT-BR
+  echo "╚══════════════════════╝"
 }
 
-# Função para exibir o menu de descompressão
-show_decompression_menu() {
-    echo "╔═══════════════════════════════╗"
-    echo "║       Tipo de Descompressão       ║"
-    echo "╠═══════════════════════════════╣"
-    echo "║ 1. .tar.gz                      ║"
-    echo "║ 2. .tar.bz2                     ║"
-    echo "║ 3. Voltar ao Menu Principal     ║"
-    echo "╚═══════════════════════════════╝"
+# menu - compression
+menu_compression () {
+  echo "╔══════════════════════╗"
+  echo "║      Compactar       ║" # Ajustado para PT-BR
+  echo "╠══════════════════════╣"
+  echo "║ 1. tar.gz            ║"
+  echo "║ 2. tar.bz2           ║"
+  echo "║ 3. Voltar ao Menu    ║" # Ajustado para PT-BR
+  echo "╚══════════════════════╝"
 }
 
-# Função para comprimir arquivos
-compress_file() {
-    local compression_type=$1
-    local source_path
-    local output_filename
-    local tar_options
+# menu - descompression
+menu_descompression () {
+  echo "╔══════════════════════╗"
+  echo "║     Descompactar     ║" # Ajustado para PT-BR
+  echo "╠══════════════════════╣"
+  echo "║ 1. tar.gz            ║"
+  echo "║ 2. tar.bz2           ║"
+  echo "║ 3. Voltar ao Menu    ║" # Ajustado para PT-BR
+  echo "╚══════════════════════╝"
+}
 
-    read -rp "Digite o caminho do arquivo/diretório para comprimir: " source_path
+# compress
+compress_file () {
+  local compression_type=$1
+  local source_path
+  local output_filename # Renomeado de output_directory para clareza
+  local tar_options
 
-    if [[ -z "$source_path" ]]; then
-        echo "Erro: Nenhum caminho fornecido."
+  read -rp "Digite o caminho (/home/utilizador/) para compactar: " source_path # Ajustado para PT-BR
+
+  if [[ -z "$source_path" ]]; then
+    echo "Erro: nenhum caminho fornecido." # Ajustado para PT-BR
+    return 1
+  fi
+
+  if [[ ! -e "$source_path"  ]]; then # Corrigido espaço extra
+    echo "Erro: caminho '$source_path' não encontrado." # Ajustado para PT-BR
+    return 1
+  fi
+
+  # Obter o nome base para o arquivo de saída
+  local compress_basename
+  compress_basename=$(get_compress_basename "$source_path")
+
+  case "$compression_type" in
+    "tar.gz")
+      output_filename="${compress_basename}.tar.gz"
+      tar_options="-czvf"
+      ;;
+    "tar.bz2")
+      output_filename="${compress_basename}.tar.bz2"
+      tar_options="-cjvf"
+      ;;
+    *)
+      echo "Erro: tipo de compactação desconhecido." # Ajustado para PT-BR
+      return 1
+      ;;
+  esac
+
+  #
+  echo "Compactando: '$source_path' para '$output_filename' " # Ajustado para PT-BR
+  local parent_dir
+  parent_dir=$(dirname "$source_path")
+  local item_to_compress # Renomeado para clareza
+  item_to_compress=$(basename "$source_path") # Corrigido: usar source_path
+
+  # Mudar para o diretório pai para que o tar não inclua a estrutura de diretórios completa
+  # e o arquivo de saída seja criado no diretório atual ou especificado.
+  # Se output_filename não tiver um caminho, será criado no diretório atual.
+  if tar "$tar_options" "$output_filename" -C "$parent_dir" "$item_to_compress"; then
+    echo "Sucesso!" # Ajustado para PT-BR
+    echo "Caminho: '$(pwd)/$output_filename'" # Mostra o caminho completo do arquivo criado
+  else
+    echo "Erro durante a compactação." # Ajustado para PT-BR
+    [[ -f "$output_filename" ]] && rm "$output_filename"
+    return 1
+  fi
+}
+
+# descompress
+descompression_file () {
+  local descompression_type=$1
+  local source_path
+  local output_directory
+  local tar_options
+
+  read -rp "Digite o caminho (/home/utilizador/) para descompactar: " source_path # Ajustado para PT-BR
+
+  if [[ -z "$source_path" ]]; then
+    echo "Erro: nenhum caminho fornecido." # Ajustado para PT-BR
+    return 1
+  fi
+
+  if [[ ! -f "$source_path" ]]; then # Alterado para -f para verificar se é um arquivo regular
+    echo "Erro: arquivo '$source_path' não encontrado ou não é um arquivo regular." # Ajustado para PT-BR
+    return 1
+  fi
+
+  read -rp "Digite o diretório de destino (deixe em branco para o atual): " output_directory # Ajustado para PT-BR
+  # manter no mesmo diretório
+  output_directory=${output_directory:-.} # Se vazio, define como diretório atual
+
+  if [[ ! -d "$output_directory" ]]; then
+    read -rp "Diretório '$output_directory' não existe. Criar? (s/n): " create_dir # Ajustado para PT-BR (s/n)
+    if [[ "$create_dir" =~ ^[Ss]$ ]];then # Aceita 's' ou 'S'
+      mkdir -p "$output_directory"
+      if [[ $? -ne 0 ]]; then
+        echo "Erro: Ao criar diretório '$output_directory'." # Ajustado para PT-BR
         return 1
-    fi
-
-    if [[ ! -e "$source_path" ]]; then
-        echo "Erro: Caminho '$source_path' não encontrado."
-        return 1
-    fi
-
-    # Pega o nome base do arquivo/diretório para usar no nome do arquivo de saída
-    local base_name
-    base_name=$(basename "$source_path")
-
-    case "$compression_type" in
-        "tar.gz")
-            output_filename="${base_name}.tar.gz"
-            tar_options="-czvf"
-            ;;
-        "tar.bz2")
-            output_filename="${base_name}.tar.bz2"
-            tar_options="-cjvf"
-            ;;
-        *)
-            echo "Erro: Tipo de compressão desconhecido."
-            return 1
-            ;;
-    esac
-
-    echo "Comprimindo '$source_path' para '$output_filename'..."
-    # Usar -C para mudar para o diretório pai do source_path antes de comprimir
-    # Isso evita que a estrutura de diretórios completa seja incluída no tarball
-    # Se source_path for um arquivo, dirname será o diretório. Se for um diretório, também.
-    local parent_dir
-    parent_dir=$(dirname "$source_path")
-    local item_to_compress
-    item_to_compress=$(basename "$source_path")
-
-    if tar "$tar_options" "$output_filename" -C "$parent_dir" "$item_to_compress"; then
-        echo "Arquivo/Diretório comprimido com sucesso como '$output_filename' no diretório atual."
+      fi
     else
-        echo "Erro durante a compressão."
-        # Tenta remover arquivo parcial se a compressão falhar
-        [[ -f "$output_filename" ]] && rm "$output_filename"
-        return 1
+      echo "Descompactação cancelada." # Ajustado para PT-BR
+      return 1
     fi
+  fi
+
+  case "$descompression_type" in
+    "tar.gz")
+      if [[ "$source_path" != *.tar.gz && "$source_path" != *.tgz ]];then
+        echo "Aviso: O ficheiro não parece ser um .tar.gz. A tentar mesmo assim." # Ajustado para PT-BR
+      fi
+      tar_options="-xzvf"
+      ;;
+    "tar.bz2")
+      # Corrigido erro de sintaxe aqui (espaço antes de ]])
+      if [[ "$source_path" != *.tar.bz2 && "$source_path" != *.tbz2 ]]; then
+        echo "Aviso: O ficheiro não parece ser um .tar.bz2. A tentar mesmo assim." # Ajustado para PT-BR
+      fi
+      tar_options="-xjvf"
+      ;;
+    *)
+      echo "Erro: Tipo de descompactação desconhecido." # Ajustado para PT-BR
+      return 1
+      ;;
+  esac
+
+  #
+  echo "Descompactando: '$source_path' para '$output_directory'." # Ajustado para PT-BR
+  if tar "$tar_options" "$source_path" -C "$output_directory"; then # Corrigido: tar_options
+    echo "Sucesso!" # Ajustado para PT-BR
+    echo "Caminho: '$output_directory'" # Ajustado para PT-BR
+  else
+    echo "Erro durante a descompactação." # Ajustado para PT-BR
+    return 1
+  fi
 }
 
-# Função para descomprimir arquivos
-decompress_file() {
-    local decompression_type=$1
-    local file_to_decompress
-    local output_directory
-    local tar_options
-
-    read -rp "Digite o caminho do arquivo para descomprimir: " file_to_decompress
-
-    if [[ -z "$file_to_decompress" ]]; then
-        echo "Erro: Nenhum arquivo fornecido."
-        return 1
-    fi
-
-    if [[ ! -f "$file_to_decompress" ]]; then
-        echo "Erro: Arquivo '$file_to_decompress' não encontrado."
-        return 1
-    fi
-
-    read -rp "Digite o diretório de destino (deixe em branco para o atual): " output_directory
-    output_directory=${output_directory:-.} # Define "." (diretório atual) se estiver vazio
-
-    if [[ ! -d "$output_directory" ]]; then
-        read -rp "Diretório '$output_directory' não existe. Criar? (s/N): " create_dir
-        if [[ "$create_dir" =~ ^[Ss]$ ]]; then
-            mkdir -p "$output_directory"
-            if [[ $? -ne 0 ]]; then
-                echo "Erro ao criar diretório '$output_directory'."
-                return 1
-            fi
-        else
-            echo "Descompressão cancelada."
-            return 1
-        fi
-    fi
-
-
-    case "$decompression_type" in
-        "tar.gz")
-            if [[ "$file_to_decompress" != *.tar.gz && "$file_to_decompress" != *.tgz ]]; then
-                echo "Aviso: O arquivo não parece ser um .tar.gz. Tentando mesmo assim."
-            fi
-            tar_options="-xzvf"
-            ;;
-        "tar.bz2")
-            if [[ "$file_to_decompress" != *.tar.bz2 && "$file_to_decompress" != *.tbz2 ]]; then
-                 echo "Aviso: O arquivo não parece ser um .tar.bz2. Tentando mesmo assim."
-            fi
-            tar_options="-xjvf"
-            ;;
-        *)
-            echo "Erro: Tipo de descompressão desconhecido."
-            return 1
-            ;;
-    esac
-
-    echo "Descomprimindo '$file_to_decompress' em '$output_directory'..."
-    if tar "$tar_options" "$file_to_decompress" -C "$output_directory"; then
-        echo "Arquivo descomprimido com sucesso em '$output_directory'."
-    else
-        echo "Erro durante a descompressão."
-        return 1
-    fi
-}
-
-# Loop principal do menu
+# menu loop
 while true; do
-    show_main_menu
-    read -rp "Escolha uma opção: " main_option
-    echo " "
+  main_menu
+  read -rp "Digite a opção: " main_option # Ajustado para PT-BR
+  echo " "
 
-    case "$main_option" in
-        1) # Compressão
-            clear
-            show_compression_menu
-            read -rp "Escolha o tipo de compressão: " compression_option
-            echo " "
-            case "$compression_option" in
-                1) compress_file "tar.gz" ;;
-                2) compress_file "tar.bz2" ;;
-                3) echo "Voltando ao menu principal..." ;;
-                *) echo "Opção inválida." ;;
-            esac
-            ;;
-        2) # Descompressão
-            clear
-            show_decompression_menu
-            read -rp "Escolha o tipo de descompressão: " descompression_option # Corrigido: decompression_option -> descompression_option
-            echo " "
-            case "$descompression_option" in
-                1) decompress_file "tar.gz" ;;
-                2) decompress_file "tar.bz2" ;;
-                3) echo "Voltando ao menu principal..." ;;
-                *) echo "Opção inválida." ;;
-            esac
-            ;;
-        3) # Sair
-            echo "Saindo..."
-            exit 0
-            ;;
-        *) # Opção inválida
-            echo "Opção inválida! Tente novamente." # Corrigido: Inmvalid -> Inválida
-            ;;
-    esac
-    echo " "
-    read -rp "Pressione Enter para continuar..."
+  case "$main_option" in
+    1)
+      # Menu - compression
+      clear
+      menu_compression
+      read -rp "Escolha o tipo de compactação: " compression_option # Ajustado para PT-BR
+      echo " "
+      case "$compression_option" in
+        1) compress_file "tar.gz" ;;
+        2) compress_file "tar.bz2" ;;
+        3) echo "A regressar ao menu!" ;; # Ajustado para PT-BR
+        *) echo "Opção Inválida" ;; # Ajustado para PT-BR
+      esac
+      ;;
+    2)
+      # Menu - descompression
+      clear
+      menu_descompression
+      read -rp "Escolha o tipo de descompactação: " descompression_option # Ajustado para PT-BR
+      echo " "
+      case "$descompression_option" in
+        1) descompression_file "tar.gz" ;;
+        2) descompression_file "tar.bz2" ;;
+        3) echo "A regressar ao menu!" ;; # Ajustado para PT-BR
+        *) echo "Opção Inválida" ;; # Ajustado para PT-BR
+      esac
+      ;;
+    3)
+      # close
+      echo "A sair do programa!" # Ajustado para PT-BR
+      exit 0
+      ;;
+    *)
+      # invalid
+      echo "Opção inválida! Por favor, tente novamente." # Ajustado para PT-BR
+      ;;
+  esac
+  echo ""
+  read -rp "Pressione Enter para continuar..." # Ajustado para PT-BR
 done
+

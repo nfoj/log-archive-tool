@@ -26,6 +26,20 @@ NO_COLOR='\033[0m'
 
 #!--------------------------------------!#
 
+# name
+compress_basename () {
+  local filename
+  filename=$(basename "$1")
+
+  # remove .*
+  filename=${filename%.tar.gz}
+  filename=${filename%.tgz}
+  filename=${filename%.tar.bz2}
+  filename=${filename%.tbz2}
+  filename=${filename%.tar}
+  echo "$filename"
+}
+
 # menu - main
 main_menu () {
   clear
@@ -49,10 +63,10 @@ menu_compression () {
   echo "╚══════════════════════╝" 
 }
 
-# menu - descompression
-menu_descompression () {
+# menu - decompression
+menu_decompression () {
   echo "╔══════════════════════╗"
-  echo "║    Descompression    ║"
+  echo "║    Decompression     ║"
   echo "╠══════════════════════╣"
   echo "║ 1. tar.gz            ║"
   echo "║ 2. tar.bz2           ║"
@@ -74,14 +88,14 @@ compress_file () {
     return 1
   fi
 
-  if [[ ! -e "$source_path"  ]]; then
+  if [[ ! -e "$source_path" ]]; then
     echo "Error: path '$source_path' not found."
     return 1
   fi
 
   #
   local compress_name
-  compress_name=$(compressname "$source_path")
+  compress_name=$(compress_basename "$source_path")
 
   case "$compression_type" in
 
@@ -107,12 +121,11 @@ compress_file () {
   local parent_dir
   parent_dir=$(dirname "$source_path")
   local item_compress
-  item_compress=$(basename "$source_name")
+  item_compress=$(basename "$source_path")
 
-  if tar "$tar_option" "$output_filename" -C "$parent_dir" "$item_compress"; then
-    echo "Sucess!"
-    echo "Path: '$output_filename'"
-
+  if tar "$tar_options" "$output_filename" -C "$parent_dir" "$item_compress"; then
+    echo "Success!"
+    echo "Path: '$(pwd)/$output_filename'"
   else
     echo "Error during compression."
     [[ -f "$output_filename" ]] && rm "$output_filename"
@@ -120,99 +133,130 @@ compress_file () {
   fi
 }
 
+# decompress
+decompression_file () {
+  local decompression_type=$1
+  local source_path
+  local output_directory
+  local tar_options
 
+  read -rp "Enter the path (/home/user/) to decompression: " source_path
 
+  if [[ -z "$source_path" ]]; then
+      echo "Error: no path provided."
+      return 1
+  fi
 
+  if [[ ! -f "$source_path" ]]; then
+      echo "Error: path '$source_path' not found."
+      return 1
+  fi
+    
+  read -rp "Enter the destination directory (leave blank for current): " output_directory
+  # keep in the same directory
+  output_directory=${output_directory:-.}
 
+  if [[ ! -d "$output_directory" ]]; then
+    read -rp "Directory '$output_directory' does not exist. Create? (y/n): " create_dir
 
-# Menu
-echo -e " "
-echo "╔══════════════════════╗"
-echo "║   File Compression   ║"
-echo "╠══════════════════════╣"
-echo "║ 1. Compression       ║"
-echo "║ 2. Descompression    ║"
-echo "║ 3. Exit              ║"
-echo "╚══════════════════════╝"
-read -p "Enter option: " main_option
-echo " "
+    if [[ "$create_dir" =~ ^[Yy]$ ]];then
+      mkdir -p "$output_directory"
 
-case "$main_option" in
+      if [[ $? -ne 0 ]]; then
+        echo "Error: Creating directory '$output_directory'."
+        return 1
+      fi
 
-  1)
-    # Menu - compression
-    echo -e " "
-    echo "╔══════════════════════╗"
-    echo "║      Compression     ║"
-    echo "╠══════════════════════╣"
-    echo "║ 1. tar.gz            ║"
-    echo "║ 2. tar.bz2           ║"
-    echo "╚══════════════════════╝"
-    read -p "Enter option: " compression_option
-    echo " "
+    else
+      echo "Decompression cancelled."
+      return 1
+    fi
+  
+  fi
 
-    case "$compression_option" in
+  case "$decompression_type" in
 
-      1)
-        read -p "Enter the path (/home/user/) to compression:  " file_to_compress
-        tar -czvf "${file_to_compress}.tar.gz" "$file_to_compress"
-        echo "File compressed to $file_to_compress.tar.gz"
-        echo -e " "
-        ;;
+    "tar.gz")
+      if [[ "$source_path" != *.tar.gz && "$source_path" != *.tgz ]];then
+        echo "Warning: The file does not appear to be a .tar.gz. Trying anyway."
+      fi
+      tar_options="-xzvf"
+      ;;
 
-      2)
-        read -p "Enter the path to compress: " file_to_compress
-        tar -cjvf "${file_to_compress}.tar.bz2" "$file_to_compress"
-        echo "File compressed to ${file_to_compress}.tar.bz2"
-        ;;
+    "tar.bz2")
+      if [[ "$source_path" != *.tar.bz2 && "$source_path" != *.tbz2 ]]; then
+        echo "Warning: The file does not appear to be a .tar.bz2. Trying anyway."
+      fi
+      tar_options="-xjvf"
+      ;;
 
-      *)
-        echo "Invalid option."
-        ;;
-        
-    esac
-    ;;
+    *)
+      echo "Error: Unknown decompression type."
+      return 1
+      ;;
+      
+  esac
 
-  2)
-    # Menu - descompression
-    echo -e " "
-    echo "╔══════════════════════╗"
-    echo "║    Descompression    ║"
-    echo "╠══════════════════════╣"
-    echo "║ 1. tar.gz            ║"
-    echo "║ 2. tar.bz2           ║"
-    echo "╚══════════════════════╝"
-    read -p "Enter option: " descompression_option
-    echo " "
+  #
+  echo "Decompressing: '$source_path' for '$output_directory'."
+  if tar "$tar_options" "$source_path" -C "$output_directory"; then
+    echo "Success!"
+    echo "Path: '$output_directory'"
 
-    case "$decompression_option" in
+  else
+    echo "Error during decompression."
+    return 1
+  fi
+}
 
-      1)
-        read -p "Enter the path to decompress: " file_to_decompress
-        tar -xzvf "$file_to_decompress"
-        cho "File decompressed."
-        ;;
+# menu loop
+while true; do
+  main_menu
+  read -rp "Enter option: " main_option
+  echo " "
 
-      2)
-        read -p "Enter the path to decompress: " file_to_decompress
-        tar -xjvf "$file_to_decompress"
-        echo "File decompressed."
-        ;;
+  case "$main_option" in
 
-      *)
-        echo "Invalid option."
-        ;;
+    1)
+      # Menu - compression
+      clear
+      menu_compression
+      read -rp "Choose the compression type: " compression_option
+      echo " "
+      case "$compression_option" in
+        1) compress_file "tar.gz" ;;
+        2) compress_file "tar.bz2" ;;
+        3) echo "Return to menu!" ;;
+        *) echo "Invalid Option" ;;
+      esac
+      ;;
 
-    esac
-    ;;
+    2)
+      # Menu - descompression
+      clear
+      menu_decompression
+      read -rp "Choose the decompression type" decompression_option
+      echo " "
+      case "$decompression_option" in
+        1) decompression_file "tar.gz" ;;
+        2) decompression_file "tar.bz2" ;;
+        3) echo "Return to menu!" ;;
+        *) echo "Invalid Option" ;;
+      esac
+      ;;
 
+    3)
+      # close
+      echo "Leaving the program!"
+      exit 0
+      ;;
 
-  3)
-    echo "Exiting..."
-    exit 0
-    ;;
-
-  *)
-    echo "Invalid option!"
-    ;;
-esac
+    *)
+      # invalid
+      echo "Invalid option! Please try again."
+      ;;
+      
+  esac
+  echo ""
+  read -rp "Press Enter to continue..."
+done
